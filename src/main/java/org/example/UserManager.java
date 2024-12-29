@@ -6,7 +6,7 @@ import javax.swing.JOptionPane;
 
 // 管理使用者註冊登入等
 public class UserManager {
-    private final String USER_FILE = "JavaExamMultiple1224Class/users.txt"; // 相對路徑
+    private final String USER_FILE = "users.txt"; // 相對路徑
     private final Map<String, String> users = new HashMap<>();
 
     public UserManager() {

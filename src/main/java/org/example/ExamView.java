@@ -2,9 +2,7 @@ package org.example;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.List;
 
@@ -95,17 +93,31 @@ public class ExamView {
     }
 
     private void loadExamContents() {
+        // 定義要讀取的檔案名稱 (位於 resources 資料夾中)
         List<String> filePaths = Arrays.asList(
                 "PY.txt",
-                "PY2.txt"
+                "Py2.txt"
         );
 
+        // 初始化一個 Map 儲存考卷名稱與內容
+        //Map<String, String> examContentMap = new HashMap<>();
+
         for (String filePath : filePaths) {
-            try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            // 使用 ClassLoader 來讀取 resources 中的檔案
+            try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+
+                // 檢查檔案是否找到
+                if (inputStream == null) {
+                    System.err.println("Error: File " + filePath + " not found in resources directory.");
+                    continue; // 如果檔案不存在，進入下一個檔案處理
+                }
+
                 StringBuilder content = new StringBuilder();
                 String examName = null;
                 String line;
 
+                // 逐行讀取檔案內容
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
                     if (line.isEmpty()) continue; // 跳過空行
@@ -118,16 +130,22 @@ public class ExamView {
                     }
                 }
 
-                // 將最後一份考卷存入 Map
+                // 如果考卷名稱與內容都存在，將考卷加入 Map
                 if (examName != null && content.length() > 0) {
                     examContentMap.put(examName, content.toString().trim());
+                    System.out.println("Loaded exam: " + examName);
                 }
             } catch (IOException e) {
                 System.err.println("Error reading file: " + filePath + " - " + e.getMessage());
             }
         }
-    }
 
+        // 測試：打印 Exam Content Map 的內容
+        for (Map.Entry<String, String> entry : examContentMap.entrySet()) {
+            System.out.println("\nExam Name: " + entry.getKey());
+            System.out.println("Exam Content:\n" + entry.getValue());
+        }
+    }
 
     private void configureButton(JButton createExamButton, JButton uploadExamButton) {
         createExamButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
