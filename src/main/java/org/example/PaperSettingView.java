@@ -79,7 +79,9 @@ public class PaperSettingView {
         return (Integer) totalScoreSpinner.getValue();
     }
 
+
     public void display() {
         SwingUtilities.invokeLater(() -> frame.setVisible(true));
     }
 }
+

@@ -11,7 +11,7 @@ public class ExamView {
     private ExamSystem system;
     private String currentUsername;
     private String userRole;
-    private Map<String, String> examContentMap;
+    private final Map<String, File> examContentMap;
 
     public ExamView(ExamSystem system, String username, String role) {
         this.system = system;
@@ -49,7 +49,8 @@ public class ExamView {
         searchButton.addActionListener(e -> {
             String searchQuery = searchBar.getText().trim();
             if (examContentMap.containsKey(searchQuery)) {
-                showExamDetails(searchQuery);
+                File examFile = examContentMap.get(searchQuery);
+                showExamDetails(searchQuery, examFile); // 傳遞文件和名稱
             } else {
                 JOptionPane.showMessageDialog(frame, "未找到考卷：" + searchQuery, "錯誤", JOptionPane.ERROR_MESSAGE);
             }
@@ -59,16 +60,7 @@ public class ExamView {
         topBar.add(searchPanel, BorderLayout.EAST);
 
         // Center panel
-        JPanel centerPanel = new JPanel(new GridLayout(0, 1, 10, 10));
-        List<String> examNames = new ArrayList<>(examContentMap.keySet());
-        for (String examName : examNames) {
-            JButton examButton = new JButton(examName);
-            examButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 24));
-            examButton.setPreferredSize(new Dimension(600, 50));
-            examButton.addActionListener(e -> showExamDetails(examName));
-            centerPanel.add(examButton);
-        }
-        JScrollPane centerScrollPane = new JScrollPane(centerPanel);
+        JScrollPane centerScrollPane = createCenterPanel();
 
         // Bottom panel
         JPanel bottomPanel = new JPanel();
@@ -91,62 +83,46 @@ public class ExamView {
         frame.add(centerScrollPane, BorderLayout.CENTER);
         frame.add(bottomPanel, BorderLayout.SOUTH);
     }
+    private JScrollPane createCenterPanel() {
+        // 使用 GridLayout 動態顯示所有考試按鈕（按列排列）
+        JPanel centerPanel = new JPanel(new GridLayout(0, 1, 10, 10)); // 動態按鈕布局
+
+        // 遍歷考卷數據 Map (examContentMap)，生成按鈕
+        for (Map.Entry<String, File> entry : examContentMap.entrySet()) {
+            String examName = entry.getKey();  // 考卷名稱
+            File examFile = entry.getValue(); // 對應考卷文件
+
+            // 創建代表此考卷的按鈕
+            JButton examButton = new JButton(examName);
+            examButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 24));
+            examButton.setPreferredSize(new Dimension(600, 50));
+
+            // 設置按鈕點擊事件，打開考卷內容界面
+            examButton.addActionListener(e -> showExamDetails(examName, examFile)); // 傳入文件和名稱
+            centerPanel.add(examButton); // 將按鈕添加到中心面板中
+        }
+
+        // 將創建的按鈕面板放置在滾動窗口
+        return new JScrollPane(centerPanel);
+    }
 
     private void loadExamContents() {
-        // 定義要讀取的檔案名稱 (位於 resources 資料夾中)
-        List<String> filePaths = Arrays.asList(
-                "PY.txt",
-                "Py2.txt"
-        );
-
-        // 初始化一個 Map 儲存考卷名稱與內容
-        //Map<String, String> examContentMap = new HashMap<>();
+        // 定義考卷文件名稱列表
+        List<String> filePaths = Arrays.asList("PY.txt", "Py2.txt", "中興109.docx");
 
         for (String filePath : filePaths) {
-            // 使用 ClassLoader 來讀取 resources 中的檔案
-            try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filePath);
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-
-                // 檢查檔案是否找到
-                if (inputStream == null) {
-                    System.err.println("Error: File " + filePath + " not found in resources directory.");
-                    continue; // 如果檔案不存在，進入下一個檔案處理
-                }
-
-                StringBuilder content = new StringBuilder();
-                String examName = null;
-                String line;
-
-                // 逐行讀取檔案內容
-                while ((line = reader.readLine()) != null) {
-                    line = line.trim();
-                    if (line.isEmpty()) continue; // 跳過空行
-
-                    // 假設每份考卷的第一行是名稱，後續是內容
-                    if (examName == null) {
-                        examName = line; // 第一行作為考卷名稱
-                    } else {
-                        content.append(line).append("\n"); // 累積考卷內容
-                    }
-                }
-
-                // 如果考卷名稱與內容都存在，將考卷加入 Map
-                if (examName != null && content.length() > 0) {
-                    examContentMap.put(examName, content.toString().trim());
-                    System.out.println("Loaded exam: " + examName);
-                }
-            } catch (IOException e) {
-                System.err.println("Error reading file: " + filePath + " - " + e.getMessage());
+            try {
+                File file = new File(getClass().getClassLoader().getResource(filePath).toURI());
+                examContentMap.put(file.getName(), file); // 儲存文件名和對應文件
+                System.out.println("Loaded exam: " + file.getName());
+            } catch (Exception e) {
+                System.err.println("無法加載考卷文件: " + filePath + " - " + e.getMessage());
             }
         }
 
-        // 測試：打印 Exam Content Map 的內容
-        for (Map.Entry<String, String> entry : examContentMap.entrySet()) {
-            System.out.println("\nExam Name: " + entry.getKey());
-            System.out.println("Exam Content:\n" + entry.getValue());
-        }
+        // 測試打印考卷列表
+        examContentMap.forEach((name, content) -> System.out.println("Exam Loaded: " + name));
     }
-
     private void configureButton(JButton createExamButton, JButton uploadExamButton) {
         createExamButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
         createExamButton.setPreferredSize(new Dimension(150, 50));
@@ -184,51 +160,50 @@ public class ExamView {
         statsUI.display();
     }
 
-    private void showExamDetails(String examName) {
-        String examContent = examContentMap.get(examName);
-        if (examContent != null) {
-            // 新增一個視窗顯示題目和作答區
-            JFrame examFrame = new JFrame("考卷: " + examName);
+    private void showExamDetails(String examName, File examFile) {
+        try {
+            // 使用 ExamController 提取文件內容
+            ExamController examController = new ExamController();
+            String examContent = examController.extractContentFromFile(examFile);
+
+            // 創建 UI 展示題目和答案區域
+            JFrame examFrame = new JFrame("考試: " + examName);
             examFrame.setSize(800, 600);
             examFrame.setLayout(new BorderLayout());
 
-            // 題目區域
             JTextArea questionArea = new JTextArea(examContent);
-            questionArea.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 18));
+            questionArea.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 16));
             questionArea.setEditable(false);
+
             JScrollPane questionScrollPane = new JScrollPane(questionArea);
 
-            // 作答區域
             JTextArea answerArea = new JTextArea();
-            answerArea.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 18));
-            JScrollPane answerScrollPane = new JScrollPane(answerArea);
+            answerArea.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 16));
 
-            // 提交按鈕
             JButton submitButton = new JButton("提交答案");
-            submitButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 18));
+            submitButton.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
             submitButton.addActionListener(e -> {
                 String answer = answerArea.getText().trim();
-                if (answer.isEmpty()) {
-                    JOptionPane.showMessageDialog(examFrame, "請填寫答案後再提交！", "錯誤", JOptionPane.ERROR_MESSAGE);
-                } else {
-                    // 將答案記錄或傳遞給後端系統處理
+                if (!answer.isEmpty()) {
                     system.submitAnswer(currentUsername, examName, answer);
                     JOptionPane.showMessageDialog(examFrame, "答案已提交！", "成功", JOptionPane.INFORMATION_MESSAGE);
-                    examFrame.dispose(); // 提交後關閉窗口
+                    examFrame.dispose();
+                } else {
+                    JOptionPane.showMessageDialog(examFrame, "請填寫答案後再提交！", "錯誤", JOptionPane.ERROR_MESSAGE);
                 }
             });
 
             JPanel answerPanel = new JPanel(new BorderLayout());
             answerPanel.add(new JLabel("作答區:"), BorderLayout.NORTH);
-            answerPanel.add(answerScrollPane, BorderLayout.CENTER);
+            answerPanel.add(new JScrollPane(answerArea), BorderLayout.CENTER);
             answerPanel.add(submitButton, BorderLayout.SOUTH);
 
-            // 添加到窗口
             examFrame.add(questionScrollPane, BorderLayout.CENTER);
             examFrame.add(answerPanel, BorderLayout.SOUTH);
             examFrame.setVisible(true);
-        } else {
-            JOptionPane.showMessageDialog(frame, "找不到這份考卷的內容！", "錯誤", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(frame, "打開考卷失敗：" + e.getMessage(), "錯誤", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
     }
 
