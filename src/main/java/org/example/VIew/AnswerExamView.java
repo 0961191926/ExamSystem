@@ -1,4 +1,4 @@
-package org.example;
+package org.example.VIew;
 
 import javax.swing.*;
 import java.awt.*;

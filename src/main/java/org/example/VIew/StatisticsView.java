@@ -1,4 +1,6 @@
-package org.example;
+package org.example.VIew;
+
+import org.example.StatisticsData;
 
 import javax.swing.*;
 import java.awt.*;
@@ -14,7 +16,7 @@ public class StatisticsView extends JFrame {
     }
 
     private void initializeUI() {
-        setTitle("統計資訊");
+        setTitle("統計資料");
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setSize(800, 600);
         setLocationRelativeTo(null);
@@ -25,11 +27,11 @@ public class StatisticsView extends JFrame {
             JPanel panel = new JPanel(new BorderLayout());
             panel.add(new JLabel(view.getClass().getSimpleName()), BorderLayout.NORTH);
 
-            StatisticsData statistics = view.getStatistics();
+            StatisticsData statistics = new StatisticsData();
             if (statistics != null) {
                 panel.add(new JTextArea(statistics.toString()), BorderLayout.CENTER);
             } else {
-                panel.add(new JLabel("無法獲取統計資訊"), BorderLayout.CENTER);
+                panel.add(new JLabel("�瘜��絞閮���"), BorderLayout.CENTER);
             }
 
             tabbedPane.addTab(view.getClass().getSimpleName(), panel);
@@ -42,6 +44,10 @@ public class StatisticsView extends JFrame {
         setVisible(true);
     }
 }
+
+
+
+
 
 
 

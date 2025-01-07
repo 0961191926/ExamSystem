@@ -1,15 +1,21 @@
-package org.example;
+package org.example.VIew;
+
+import org.example.Controller.AccountController;
+import org.example.ExamSystem;
 
 import javax.swing.*;
 import java.awt.event.*;
 
 // 登入UI
+import java.awt.*;
+
+// 登入UI
 public class LoginView {
     private JFrame frame;
-    private ExamSystem system;
+    private AccountController accountController;
 
-    public LoginView(ExamSystem system) {
-        this.system = system;
+    public LoginView(AccountController accountController) {
+        this.accountController = accountController;
         initializeUI();
     }
 
@@ -38,9 +44,9 @@ public class LoginView {
         registerButton.addActionListener(e -> {
             String username = accountField.getText();
             String password = new String(passwordField.getPassword());
-            String role = JOptionPane.showInputDialog(frame, "Enter Role (e.g., Admin, User)");
 
-            if (system.getUserManager().registerUser(username, password, role)) {
+
+            if (accountController.handleRegisterRequest(username, password, "student" )) {
                 JOptionPane.showMessageDialog(frame, "Registration successful.");
             } else {
                 JOptionPane.showMessageDialog(frame, "Registration failed. Username might already exist.");
@@ -67,13 +73,29 @@ public class LoginView {
     }
 
     private void login(String username, String password) {
-        if (system.getUserManager().validateLogin(username, password)) {
-            String role = system.getUserManager().getUserRole(username); // 取得角色
-            frame.dispose(); // 關閉登入畫面
-            system.showMainSystem(username, role); // 顯示主畫面，並傳遞角色
+        System.out.println("Attempting to execute handleLoginRequest...");
+        if (this.accountController.handleLoginRequest(username, password)) {
+            System.out.println("handleLoginRequest executed successfully!");
+            String role = this.accountController.handleGetUserRoleRequest(username);
+            this.frame.dispose(); // 關閉登入視窗
+
+            // 呼叫 ExamSystem 的 showMainSystem 方法來顯示主系統畫面
+            SwingUtilities.invokeLater(() -> {
+                ExamSystem examSystem = new ExamSystem(); // 假設 ExamSystem 是主要的系統類別
+                examSystem.showMainSystem(username, role);
+            });
         } else {
+            System.out.println("handleLoginRequest execution failed or returned false.");
+            JOptionPane.showMessageDialog((Component) null, "Login failed.");
         }
     }
+    public void dismiss() {
+        frame.setVisible(false);
+    }
+
+
+
+
 
     public void display() {
         frame.setVisible(true);

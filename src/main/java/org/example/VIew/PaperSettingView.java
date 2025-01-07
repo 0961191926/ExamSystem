@@ -1,4 +1,4 @@
-package org.example;
+package org.example.VIew;
 
 import javax.swing.*;
 import java.awt.*;
@@ -12,6 +12,12 @@ public class PaperSettingView {
     private Map<String, JSpinner> questionSpinners;
     private Map<String, Integer> questionScores;
     private JSpinner totalScoreSpinner;
+    private boolean isSettingsSaved = false; // Add this flag
+
+    // Add getter for the flag
+    public boolean isSettingsSaved() {
+        return isSettingsSaved;
+    }
 
     public PaperSettingView(List<String> questions) {
         this.questions = questions;
@@ -51,9 +57,15 @@ public class PaperSettingView {
         // 儲存設定的按鈕
         JButton saveButton = new JButton("儲存設定");
         saveButton.addActionListener(e -> {
+            for (Map.Entry<String, JSpinner> entry : questionSpinners.entrySet()) {
+                questionScores.put(entry.getKey(), (Integer) entry.getValue().getValue());
+            }
+
             JOptionPane.showMessageDialog(frame,
                     "設定已儲存！\n總分: " + totalScoreSpinner.getValue() +
                             "\n題目分數: " + questionScores.toString());
+
+            isSettingsSaved = true; // Set the flag to true when settings are saved
             frame.dispose();
         });
 
@@ -79,9 +91,7 @@ public class PaperSettingView {
         return (Integer) totalScoreSpinner.getValue();
     }
 
-
     public void display() {
         SwingUtilities.invokeLater(() -> frame.setVisible(true));
     }
 }
-

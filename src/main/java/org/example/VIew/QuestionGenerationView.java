@@ -1,10 +1,14 @@
-package org.example;
+package org.example.VIew;
+
+import org.example.Controller.MultipartUploader;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,12 +16,38 @@ import java.util.Map;
 
 // 手動出題UI
 public class QuestionGenerationView {
+    // 添加新的成员变量
+    private boolean isPublic = true;
+    private final String SAVE_PATH = "D:\\Quiz\\";
+    private PaperSettingView paperSettingView;
+    private final Map<String, String> questionTypes = new HashMap<>();
+    private final Map<String, List<String>> questionChoices = new HashMap<>();
 
     private final List<String> questions = new ArrayList<>();
     private final Map<String, String> answers = new HashMap<>();
 
     private JTextArea questionListArea; // To store and display questions and answers
     private JTextField examTitleField;  // To input the exam title
+
+    // 在 display() 方法中的 leftPanel 部分添加考卷类型选择
+    private void addExamTypeSelection(JPanel leftPanel) {
+        JPanel examTypePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        examTypePanel.add(new JLabel("考卷類型:"));
+        JRadioButton publicButton = new JRadioButton("Public", true);
+        JRadioButton privateButton = new JRadioButton("Private");
+        ButtonGroup group = new ButtonGroup();
+        group.add(publicButton);
+        group.add(privateButton);
+
+        publicButton.addActionListener(e -> isPublic = true);
+        privateButton.addActionListener(e -> isPublic = false);
+        publicButton.setVisible(false);
+        privateButton.setVisible(false);
+        examTypePanel.add(publicButton);
+        examTypePanel.add(privateButton);
+        examTypePanel.setVisible(false);
+        leftPanel.add(examTypePanel);
+    }
 
     public void display() {
         JFrame createExamFrame = new JFrame("手動出題");
@@ -30,10 +60,13 @@ public class QuestionGenerationView {
 
         // 左側的考卷題目輸入區域
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        leftPanel.add(new JLabel("考卷題目:"));
+        leftPanel.add(new JLabel("考卷名稱:"));
         examTitleField = new JTextField(20);
         leftPanel.add(examTitleField);
+        // 在这里调用 addExamTypeSelection，传入已创建的 leftPanel
+        addExamTypeSelection(leftPanel);
         selectionPanel.add(leftPanel, BorderLayout.WEST);
+
 
         // 右側的下拉選單和按鈕
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -65,6 +98,9 @@ public class QuestionGenerationView {
         splitPane.setDividerLocation(300);
         createExamFrame.add(splitPane, BorderLayout.CENTER);
 
+
+
+
         // 儲存按鈕
         JButton saveButton = new JButton("儲存考卷");
         JPanel buttonPanel = new JPanel();
@@ -76,13 +112,62 @@ public class QuestionGenerationView {
             createQuestionPanel(questionType, questionPanel);
         });
 
+        // 修改 saveButton 的 ActionListener
         saveButton.addActionListener(e -> {
             String examTitle = examTitleField.getText().trim();
             if (!examTitle.isEmpty()) {
-                saveExamToFile(examTitle); // 儲存考卷到檔案
-                new PaperSettingView(questions).display(); // 顯示分數設定視窗
-                createExamFrame.dispose(); // 關閉 CreateExam 視窗
-                clearExamData(); // 清除問題與答案
+                paperSettingView = new PaperSettingView(questions);
+                paperSettingView.display();
+
+                // 等待分数设置窗口关闭后再保存文件
+                JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(saveButton);
+                frame.setEnabled(false);
+
+                new Thread(() -> {
+                    // Wait until settings are saved
+                    while (!paperSettingView.isSettingsSaved()) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+
+                    // Only save files if settings were actually saved
+                    if (paperSettingView.isSettingsSaved()) {
+                        new Thread(() -> {
+                            try {
+                                // 儲存考卷文件（確保完成）
+                                saveExamFiles(examTitle);
+
+                                // 在保存完成後執行其餘操作
+                                SwingUtilities.invokeLater(() -> {
+                                    frame.dispose();    // 關閉窗口
+                                    clearExamData();    // 清理數據
+
+                                    // 上傳文件
+                                    uploadAllFiles(
+                                            SAVE_PATH +examTitle + "_Question.txt",  // 考卷文件
+                                            SAVE_PATH +examTitle + "_Answer.txt",    // 答案文件
+                                            SAVE_PATH +examTitle + "_Setting.txt",   // 設定文件
+                                            "http://localhost:8080/upload" // 伺服器地址（可替換）
+                                    );
+                                });
+                            } catch (Exception k) {
+                                // 處理保存時可能發生的錯誤
+                                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                                        null,
+                                        "保存考卷失敗: " + k.getMessage(),
+                                        "錯誤",
+                                        JOptionPane.ERROR_MESSAGE
+                                ));
+                            }
+                        }).start(); // 新執行緒，避免阻塞主 UI 線程
+                    }else {
+                        SwingUtilities.invokeLater(() -> frame.setEnabled(true));
+                    }
+                }).start();
             } else {
                 JOptionPane.showMessageDialog(createExamFrame, "請輸入考卷名稱！", "錯誤", JOptionPane.ERROR_MESSAGE);
             }
@@ -155,6 +240,7 @@ public class QuestionGenerationView {
                 questionListArea.append("問題: " + question + " 答案: " + answer + "\n");
                 questions.add(question);
                 answers.put(question, answer);
+                questionTypes.put(question, "True/False"); // Store question type
                 questionField.setText("");
                 tfGroup.clearSelection();
             } else {
@@ -239,6 +325,15 @@ public class QuestionGenerationView {
                 questionListArea.append("問題: " + question + " 答案: " + selectedAnswers.toString().trim() + "\n");
                 questions.add(question);
                 answers.put(question, selectedAnswers.toString().trim());
+
+                questionTypes.put(question, "Multiple Choice"); // Store question type
+                // Store choices
+                List<String> choices = new ArrayList<>();
+                for (JTextField optionField : optionFields) {
+                    choices.add(optionField.getText().trim());
+                }
+                questionChoices.put(question, choices);
+
                 questionField.setText(""); // 清空問題欄位
                 for (JCheckBox checkBox : answerCheckBoxes) {
                     checkBox.setSelected(false); // 清空所有選擇框
@@ -271,6 +366,7 @@ public class QuestionGenerationView {
                 questionListArea.append("問題: " + questionField.getText().trim() + " 答案: " + answerField.getText().trim() + "\n");
                 questions.add(question); // 將題目加入清單
                 answers.put(question, answer); // 將答案加入清單
+                questionTypes.put(question, "Short Answer"); // Store question type
                 questionField.setText(""); // 清空問題輸入框
                 answerField.setText(""); // 清空答案輸入框
             } else {
@@ -278,17 +374,51 @@ public class QuestionGenerationView {
             }
         });
     }
+    // 新的保存文件方法
+    private void saveExamFiles(String examTitle) {
+        try {
+            // 保存问题文件
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(SAVE_PATH + examTitle + "_Question.txt"))) {
+                writer.write("ExamTitle: " + examTitle + "\n\n");
+                for (String question : questions) {
+                    String questionType = questionTypes.get(question);
+                    writer.write(questionType + " Question: " + question + "\n");
 
-    private void saveExamToFile(String examTitle) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(examTitle + ".txt"))) {
-            writer.write("考卷標題: " + examTitle + "\n\n");
-            for (String question : questions) {
-                writer.write("問題: " + question + "\n");
-                writer.write("答案: " + answers.get(question) + "\n\n");
+                    if (questionType.equals("Multiple Choice")) {
+                        List<String> choices = questionChoices.get(question);
+                        writer.write("choice: ");
+                        writer.write(String.join(" , ", choices));
+                        writer.write("\n");
+                    }
+                    writer.write("\n"); // Add extra newline for readability
+                }
             }
-            JOptionPane.showMessageDialog(null, "考卷已儲存！", "成功", JOptionPane.INFORMATION_MESSAGE);
+
+            // 保存答案文件
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(SAVE_PATH + examTitle + "_Answer.txt"))) {
+                writer.write("ExamTitle: " + examTitle + "\n\n");
+                for (String question : questions) {
+                    writer.write("Question: " + question + "\n");
+                    writer.write("Answer: " + answers.get(question) + "\n\n");
+
+                }
+            }
+
+            // 保存设置文件
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(SAVE_PATH + examTitle + "_Setting.txt"))) {
+                writer.write("Title: " + examTitle + "\n");
+                writer.write("Public/Private?: " + (isPublic ? "Public" : "Private") + "\n");
+                writer.write("TotalScore: " + paperSettingView.getTotalScore() + "\n\n");
+                writer.write("Number of questions: " + questions.size() + "\n\n");
+
+                writer.write("Arrangement:\n");
+                Map<String, Integer> questionScores = paperSettingView.getQuestionScores();
+                for (String question : questions) {
+                    writer.write("Question: " + question + "\n");
+                    writer.write("Score: " + questionScores.get(question) + "\n\n");
+                }
+            }
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(null, "儲存考卷時出錯！", "錯誤", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -296,5 +426,29 @@ public class QuestionGenerationView {
         questions.clear();
         answers.clear();
         questionListArea.setText("");
+    }
+    private void uploadAllFiles(String examFile, String answerFilePath, String settingFilePath, String serverUrl) {
+        try {
+            // 提取 dirName（从 examFile 的文件名获取，无扩展名）
+            String dirName = Paths.get(examFile).getFileName().toString();
+            dirName = dirName.substring(0, dirName.lastIndexOf('.')); // 去掉扩展名
+
+            // 使用 MultipartUploader
+            MultipartUploader uploader = new MultipartUploader();
+            uploader.setDirName(dirName) // 设置 dirName
+                    .addFile("examFile", Paths.get(examFile)) // 添加考卷文件
+                    .addFile("answerFile", Paths.get(answerFilePath)) // 添加答案文件
+                    .addFile("settingFile", Paths.get(settingFilePath)); // 添加設定文件
+
+            // 执行文件上传
+            String response = uploader.upload(serverUrl);
+
+            // 显示提示
+            JOptionPane.showMessageDialog(null, response, "文件上传成功", JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "文件上传失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
     }
 }

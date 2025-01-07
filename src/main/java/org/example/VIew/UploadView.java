@@ -1,17 +1,25 @@
-package org.example;
+package org.example.VIew;
+
+import org.example.Controller.ExamController;
+import org.example.Controller.MultipartUploader;
+import org.example.ExamSystem;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class UploadView {
     private ExamController examController;
+    private ExamSystem system;
 
-    public UploadView() {
-        this.examController = new ExamController();
+    public UploadView(ExamSystem system) {
+        this.system = system;
+        this.examController = system.getExamController();
     }
 
     public void upload() {
@@ -93,7 +101,7 @@ public class UploadView {
         String[] columnNames = {"題目", "分數", "答案"};
         Object[][] data = new Object[questionCount][3];
         for (int i = 0; i < questionCount; i++) {
-            data[i][0] = "第 " + (i + 1) + " 題";
+            data[i][0] = "Q" + (i + 1) ;
             data[i][1] = 0; // 默认分数
             data[i][2] = ""; // 默认答案为空
         }
@@ -105,21 +113,66 @@ public class UploadView {
         saveButton.addActionListener(e -> {
             List<String> settings = new ArrayList<>();
             List<String> answers = new ArrayList<>();
-
+            int totalScore = 0;
             try {
-                for (int i = 0; i < questionCount; i++) {
-                    String questionNumber = table.getValueAt(i, 0).toString();
-                    int score = Integer.parseInt(table.getValueAt(i, 1).toString());
-                    String answer = table.getValueAt(i, 2).toString();
+                StringBuilder formattedResult = new StringBuilder();
+                formattedResult.append("ExamTitle: upload\n\n");
+                settings.add("ExamTitle: upload");
+                settings.add("Public/Private?: Public");
+                settings.add("TotalScore: null");
+                settings.add("Number of questions: " + questionCount);
+                settings.add("\nArrangement:\n");
+                answers.add("ExamTitle: upload");
+                System.out.println("行數:" + table.getRowCount());
+                for (int i = 0; i < table.getRowCount(); i++) {
+                    String question = (String) table.getValueAt(i, 0); // 获取“题目”
+                    String score=(String)table.getValueAt(i,1);
+                    String answer = (String) table.getValueAt(i, 2); // 获取“答案”
 
-                    settings.add(questionNumber + ",分數" + score);
-                    answers.add(questionNumber + ",答案" + answer);
+
+
+
+                    // 添加到设置格式（不包含答案）
+                    settings.add("Question: " + question + "\nScore: " + score);
+
+                    // 将答案单独存入答案列表
+                    answers.add("Question: " + question);
+                    answers.add("Answer: " + answer);
                 }
 
+
+                // 构建最终结果字符串
+
+                StringBuilder formattedResult2 = new StringBuilder();
+
+                formattedResult2.append("Title: \n");
+                formattedResult2.append("Public/Private?: Public\n");
+                formattedResult2.append("TotalScore: ").append(totalScore).append("\n\n");
+                formattedResult2.append("Number of questions: ").append(table.getRowCount()).append("\n\n");
+                formattedResult2.append("Arrangement:\n");
+
+                for (String setting : settings) {
+                    formattedResult2.append(setting).append("\n");
+                }
+                // 自動生成文件名 (基於上傳檔案的名稱生成後綴)
+                String originalFileName = uploadedFile.getName();
+                String baseFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); // 去掉檔名的副檔名
+
+                // 生成自訂文件名
+                String answerFileName = baseFileName + "_answer.txt";
+                String settingFileName = baseFileName + "_setting.txt";
+
+
                 // 保存到文件
-                saveAnswersToFile(answers, "answer.txt");
-                saveSettingsToFile(settings, "setting.txt");
-                saveUploadInfoToFile(uploadedFile.getName(), "setting.txt", "answer.txt");
+                saveAnswersToFile(answers, answerFileName);
+                saveSettingsToFile(settings, settingFileName);
+                saveUploadInfoToFile(uploadedFile.getName(), settingFileName, answerFileName);
+                uploadAllFiles(
+                        uploadedFile,                 // 考卷文件
+                        answerFileName,               // Answer 文件
+                        settingFileName,              // Settings 文件
+                        "http://localhost:8080/upload" // 伺服器地址（可替換）
+                );
 
                 JOptionPane.showMessageDialog(frame, "設置已保存! 所有資料已保存至文件。", "成功", JOptionPane.INFORMATION_MESSAGE);
                 frame.dispose();
@@ -128,7 +181,6 @@ public class UploadView {
                 ex.printStackTrace();
             }
         });
-
         frame.add(scrollPane, BorderLayout.CENTER);
         frame.add(saveButton, BorderLayout.SOUTH);
         frame.setVisible(true);
@@ -166,6 +218,44 @@ public class UploadView {
         } catch (IOException e) {
             JOptionPane.showMessageDialog(null, "保存上傳資訊失敗: " + e.getMessage(), "錯誤", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
+        }
+    }
+    private void uploadAllFiles(File examFile, String answerFilePath, String settingFilePath, String serverUrl) {
+        try {
+            // 验证文件是否存在
+            if (!examFile.exists()) {
+                throw new IOException("Exam file does not exist: " + examFile.getAbsolutePath());
+            }
+            if (!Files.exists(Paths.get(answerFilePath))) {
+                throw new IOException("Answer file does not exist: " + answerFilePath);
+            }
+            if (!Files.exists(Paths.get(settingFilePath))) {
+                throw new IOException("Setting file does not exist: " + settingFilePath);
+            }
+
+            // 提取 dirName（从文件名去掉扩展名）
+            String dirName = examFile.getName().substring(0, examFile.getName().lastIndexOf('.'));
+            System.out.println("dirName: " + dirName);
+
+            // 使用 MultipartUploader
+            MultipartUploader uploader = new MultipartUploader();
+            uploader.setDirName(dirName) // 设置 dirName
+                    .addFile("examFile", examFile.toPath()) // 添加考卷文件
+                    .addFile("answerFile", Paths.get(answerFilePath)) // 添加答案文件
+                    .addFile("settingFile", Paths.get(settingFilePath)); // 添加设置文件
+
+            // 打印上传目标 URL
+            System.out.println("Server URL: " + serverUrl);
+
+            // 执行文件上传
+            String response = uploader.upload(serverUrl);
+
+            // 显示提示
+            JOptionPane.showMessageDialog(null, response, "文件上传成功", JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "文件上传失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace(); // 打印完整异常详情
         }
     }
 }

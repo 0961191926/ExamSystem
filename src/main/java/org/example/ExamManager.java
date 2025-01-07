@@ -1,5 +1,7 @@
 package org.example;
 
+import org.example.Communicator.ClientServerCommunicator;
+
 import java.io.*;
 import java.util.*;
 
@@ -13,7 +15,7 @@ public class ExamManager {
     /**
      * 构造函数 - 初始化加载考试
      */
-    public ExamManager() {
+    public ExamManager(ClientServerCommunicator communicator) {
         loadExamsFromFile();
     }
 
@@ -115,7 +117,7 @@ public class ExamManager {
     }
 
     /**
-     * 列出用户已完成的考试
+     * 列出用户已完 成的考试
      */
     public List<String> getCompletedExams(String username) {
         Map<String, String> userAnswers = studentAnswers.get(username);

@@ -1,4 +1,6 @@
-package org.example;
+package org.example.VIew;
+
+import org.example.StatisticsData;
 
 public class PaperStatisticsView implements StatisticView {
     private StatisticsData paperStatisticsData;
@@ -18,9 +20,16 @@ public class PaperStatisticsView implements StatisticView {
     }
 
     @Override
-    public StatisticsData getStatistics() {
-        return this.paperStatisticsData;
+    public void showStatistics(org.example.VIew.StatisticsData data) {
+
     }
+
+    @Override
+    public void updateStatistics(org.example.VIew.StatisticsData data) {
+
+    }
+
+
 }
 
 // 其他統計視圖類的實現類似

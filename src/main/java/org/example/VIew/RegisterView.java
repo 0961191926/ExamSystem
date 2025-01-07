@@ -1,4 +1,6 @@
-package org.example;
+package org.example.VIew;
+
+import org.example.ExamSystem;
 
 import javax.swing.*;
 
